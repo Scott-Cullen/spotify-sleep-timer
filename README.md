@@ -8,8 +8,7 @@ app notification updated with the remaining time.
 
 - Starts a Spotify playlist or resumes the current queue on a selected
   `media_player` entity.
-- Exposes a playlist selector with `Current queue` and the last 5 playlists
-  started by this integration.
+- Exposes a playlist selector with `Current queue` and up to 5 named playlists.
 - Connects to an existing Home Assistant Spotify integration entry.
 - Creates a Home Assistant sleep timer for the requested duration.
 - Creates a single Android chronometer notification that counts down locally.
@@ -68,14 +67,25 @@ To start a specific playlist instead, pass a Spotify playlist URI or link:
 ```yaml
 service: spotify_sleep_timer.start
 data:
+  playlist_name: Sleep playlist
   playlist_uri: spotify:playlist:37i9dQZF1DX4WYpdgoIcn6
   duration: 1800
 ```
 
 Every playlist started through this integration is saved into
-`select.spotify_sleep_timer_playlist`, keeping the 5 most recent playlist URIs.
+`select.spotify_sleep_timer_playlist`, keeping the 5 most recent named
+playlists. You can also save or rename a playlist without starting a timer:
+
+```yaml
+service: spotify_sleep_timer.save_playlist
+data:
+  playlist_name: Sleep playlist
+  playlist_uri: spotify:playlist:37i9dQZF1DX4WYpdgoIcn6
+```
+
 The Spotify integration does not expose a general playback history to custom
-integrations, so this selector tracks playlists used by the sleep timer itself.
+integrations, so this selector tracks playlists saved or used by the sleep timer
+itself.
 
 On Android, the notification is sent once with a persistent tagged chronometer,
 so the phone counts down locally instead of receiving a new notification every

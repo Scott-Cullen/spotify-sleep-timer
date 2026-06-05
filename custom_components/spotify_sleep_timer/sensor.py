@@ -66,6 +66,7 @@ class SpotifySleepTimerSensor(SensorEntity):
         active_timers = {
             timer_id: {
                 "media_player": active.media_player,
+                "playlist_name": active.playlist_name,
                 "playlist_uri": active.playlist_uri,
                 "duration": active.duration,
                 "remaining_seconds": active.remaining_seconds,
@@ -79,6 +80,7 @@ class SpotifySleepTimerSensor(SensorEntity):
         return {
             "timer_id": timer.timer_id,
             "media_player": timer.media_player,
+            "playlist_name": timer.playlist_name,
             "playlist_uri": timer.playlist_uri,
             "duration": timer.duration,
             "remaining_seconds": timer.remaining_seconds,

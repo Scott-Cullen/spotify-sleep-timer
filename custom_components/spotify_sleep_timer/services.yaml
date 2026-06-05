@@ -9,6 +9,12 @@ start:
       selector:
         entity:
           domain: media_player
+    playlist_name:
+      name: Playlist name
+      description: Friendly name to show in the playlist selector when saving playlist_uri.
+      required: false
+      selector:
+        text:
     playlist_uri:
       name: Playlist URI
       description: Optional Spotify playlist URI. If omitted, the selected recent playlist is used, or the current queue resumes when the selector is set to Current queue.
@@ -45,5 +51,21 @@ cancel:
       name: Timer ID
       description: Timer ID to cancel. Defaults to spotify_sleep_timer.
       required: false
+      selector:
+        text:
+save_playlist:
+  name: Save Spotify sleep timer playlist
+  description: Save or rename a playlist for the playlist selector without starting a timer.
+  fields:
+    playlist_name:
+      name: Playlist name
+      description: Friendly name to show in the playlist selector.
+      required: true
+      selector:
+        text:
+    playlist_uri:
+      name: Playlist URI
+      description: Spotify playlist URI or URL.
+      required: true
       selector:
         text:

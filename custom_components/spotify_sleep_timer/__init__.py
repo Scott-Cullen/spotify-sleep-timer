@@ -28,6 +28,7 @@ from .const import (
     CONF_SPOTIFY_CONFIG_ENTRY_ID,
     CURRENT_QUEUE_OPTION,
     ATTR_NOTIFY_SERVICE,
+    ATTR_PLAYLIST_NAME,
     ATTR_PLAYLIST_URI,
     ATTR_TIMER_ID,
     DATA_MANAGER,
@@ -47,6 +48,7 @@ _LOGGER = logging.getLogger(__name__)
 START_SERVICE_SCHEMA = vol.Schema(
     {
         vol.Optional(ATTR_MEDIA_PLAYER): cv.entity_id,
+        vol.Optional(ATTR_PLAYLIST_NAME): cv.string,
         vol.Optional(ATTR_PLAYLIST_URI): cv.string,
         vol.Required(ATTR_DURATION): vol.All(vol.Coerce(int), vol.Range(min=1)),
         vol.Optional(ATTR_NOTIFY_SERVICE): cv.string,
@@ -58,6 +60,21 @@ CANCEL_SERVICE_SCHEMA = vol.Schema(
     {vol.Optional(ATTR_TIMER_ID, default=DEFAULT_TIMER_ID): cv.string}
 )
 
+SAVE_PLAYLIST_SCHEMA = vol.Schema(
+    {
+        vol.Required(ATTR_PLAYLIST_NAME): cv.string,
+        vol.Required(ATTR_PLAYLIST_URI): cv.string,
+    }
+)
+
+
+@dataclass
+class PlaylistEntry:
+    """A named Spotify playlist saved for the selector."""
+
+    name: str
+    uri: str
+
 
 @dataclass
 class SleepTimer:
@@ -65,6 +82,7 @@ class SleepTimer:
 
     timer_id: str
     media_player: str
+    playlist_name: str | None
     playlist_uri: str | None
     notify_service: str
     started_at: datetime
@@ -85,7 +103,7 @@ class SpotifySleepTimerManager:
     def __init__(self, hass: HomeAssistant) -> None:
         self.hass = hass
         self.timers: dict[str, SleepTimer] = {}
-        self.playlist_history: list[str] = []
+        self.playlist_history: list[PlaylistEntry] = []
         self.selected_playlist_uri: str | None = None
         self._store = Store(hass, STORAGE_VERSION, STORAGE_KEY)
         self._listeners: set[Callable[[], None]] = set()
@@ -117,28 +135,43 @@ class SpotifySleepTimerManager:
     @property
     def playlist_options(self) -> list[str]:
         """Return the playlist options shown by the select entity."""
-        return [CURRENT_QUEUE_OPTION, *self.playlist_history]
+        return [CURRENT_QUEUE_OPTION, *[entry.name for entry in self.playlist_history]]
 
     @property
     def selected_playlist_option(self) -> str:
         """Return the current select option."""
-        return self.selected_playlist_uri or CURRENT_QUEUE_OPTION
+        entry = self.playlist_entry_by_uri(self.selected_playlist_uri)
+        return entry.name if entry is not None else CURRENT_QUEUE_OPTION
+
+    @callback
+    def playlist_entry_by_name(self, name: str) -> PlaylistEntry | None:
+        """Return a playlist entry by display name."""
+        for entry in self.playlist_history:
+            if entry.name == name:
+                return entry
+        return None
+
+    @callback
+    def playlist_entry_by_uri(self, uri: str | None) -> PlaylistEntry | None:
+        """Return a playlist entry by URI."""
+        if uri is None:
+            return None
+        for entry in self.playlist_history:
+            if entry.uri == uri:
+                return entry
+        return None
 
     async def async_load(self) -> None:
         """Load persisted playlist history."""
         data = await self._store.async_load() or {}
         playlist_history = data.get("playlist_history", [])
         if isinstance(playlist_history, list):
-            self.playlist_history = [
-                playlist
-                for playlist in playlist_history[:MAX_PLAYLIST_HISTORY]
-                if isinstance(playlist, str)
-            ]
+            self.playlist_history = normalize_playlist_history(playlist_history)
 
         selected_playlist_uri = data.get("selected_playlist_uri")
         if (
             isinstance(selected_playlist_uri, str)
-            and selected_playlist_uri in self.playlist_history
+            and self.playlist_entry_by_uri(selected_playlist_uri) is not None
         ):
             self.selected_playlist_uri = selected_playlist_uri
 
@@ -146,8 +179,8 @@ class SpotifySleepTimerManager:
         """Select a playlist option."""
         if option == CURRENT_QUEUE_OPTION:
             self.selected_playlist_uri = None
-        elif option in self.playlist_history:
-            self.selected_playlist_uri = option
+        elif (entry := self.playlist_entry_by_name(option)) is not None:
+            self.selected_playlist_uri = entry.uri
         else:
             raise ValueError(f"Unknown playlist option: {option}")
 
@@ -158,27 +191,37 @@ class SpotifySleepTimerManager:
         """Persist playlist history."""
         await self._store.async_save(
             {
-                "playlist_history": self.playlist_history,
+                "playlist_history": [
+                    {"name": entry.name, "uri": entry.uri}
+                    for entry in self.playlist_history
+                ],
                 "selected_playlist_uri": self.selected_playlist_uri,
             }
         )
 
-    async def async_remember_playlist(self, playlist_uri: str) -> None:
+    async def async_remember_playlist(
+        self, playlist_uri: str, playlist_name: str | None = None
+    ) -> None:
         """Remember the playlist URI used by the sleep timer."""
+        playlist_name = normalize_playlist_name(playlist_name, playlist_uri)
         self.playlist_history = [
-            playlist
-            for playlist in self.playlist_history
-            if playlist != playlist_uri
+            entry
+            for entry in self.playlist_history
+            if entry.uri != playlist_uri and entry.name != playlist_name
         ]
-        self.playlist_history.insert(0, playlist_uri)
+        self.playlist_history.insert(
+            0, PlaylistEntry(name=playlist_name, uri=playlist_uri)
+        )
         self.playlist_history = self.playlist_history[:MAX_PLAYLIST_HISTORY]
         self.selected_playlist_uri = playlist_uri
         await self.async_save_playlist_history()
+        self.async_notify_listeners()
 
     async def async_start(
         self,
         timer_id: str,
         media_player: str,
+        playlist_name: str | None,
         playlist_uri: str | None,
         duration: int,
         notify_service: str,
@@ -190,7 +233,11 @@ class SpotifySleepTimerManager:
             await self.async_cancel(timer_id, send_notification=False)
 
         if playlist_uri:
-            await self.async_remember_playlist(playlist_uri)
+            playlist_entry = self.playlist_entry_by_uri(playlist_uri)
+            playlist_name = playlist_name or (
+                playlist_entry.name if playlist_entry is not None else None
+            )
+            await self.async_remember_playlist(playlist_uri, playlist_name)
             await self.hass.services.async_call(
                 "media_player",
                 "play_media",
@@ -236,6 +283,9 @@ class SpotifySleepTimerManager:
         self.timers[timer_id] = SleepTimer(
             timer_id=timer_id,
             media_player=media_player,
+            playlist_name=normalize_playlist_name(playlist_name, playlist_uri)
+            if playlist_uri
+            else None,
             playlist_uri=playlist_uri,
             notify_service=notify_service,
             started_at=now,
@@ -400,6 +450,53 @@ def format_duration(seconds: int) -> str:
     return f"{minutes} min"
 
 
+def normalize_playlist_history(history: list[object]) -> list[PlaylistEntry]:
+    """Return playlist history entries, migrating URL-only history."""
+    entries: list[PlaylistEntry] = []
+    seen_names: set[str] = set()
+    seen_uris: set[str] = set()
+
+    for item in history:
+        if isinstance(item, str):
+            name = playlist_name_from_uri(item)
+            uri = item
+        elif isinstance(item, dict):
+            uri = item.get("uri")
+            name = item.get("name")
+            if not isinstance(uri, str):
+                continue
+            name = normalize_playlist_name(name if isinstance(name, str) else None, uri)
+        else:
+            continue
+
+        if name in seen_names or uri in seen_uris:
+            continue
+        entries.append(PlaylistEntry(name=name, uri=uri))
+        seen_names.add(name)
+        seen_uris.add(uri)
+        if len(entries) >= MAX_PLAYLIST_HISTORY:
+            break
+
+    return entries
+
+
+def normalize_playlist_name(playlist_name: str | None, playlist_uri: str) -> str:
+    """Return a friendly playlist name."""
+    if playlist_name is not None and playlist_name.strip():
+        return playlist_name.strip()
+    return playlist_name_from_uri(playlist_uri)
+
+
+def playlist_name_from_uri(playlist_uri: str) -> str:
+    """Return a readable fallback name from a Spotify playlist URI or URL."""
+    playlist_id = playlist_uri.split("?", 1)[0].rstrip("/").rsplit("/", 1)[-1]
+    if ":" in playlist_id:
+        playlist_id = playlist_id.rsplit(":", 1)[-1]
+    if playlist_id:
+        return f"Playlist {playlist_id[:8]}"
+    return "Spotify playlist"
+
+
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Set up Spotify Sleep Timer from a config entry."""
     hass.data.setdefault(DOMAIN, {})
@@ -505,6 +602,7 @@ def async_register_services(
         await manager.async_start(
             timer_id=data[ATTR_TIMER_ID],
             media_player=media_player,
+            playlist_name=data.get(ATTR_PLAYLIST_NAME),
             playlist_uri=data.get(ATTR_PLAYLIST_URI),
             duration=data[ATTR_DURATION],
             notify_service=notify_service,
@@ -513,6 +611,13 @@ def async_register_services(
     async def async_handle_cancel(call: ServiceCall) -> None:
         data = CANCEL_SERVICE_SCHEMA(dict(call.data))
         await manager.async_cancel(data[ATTR_TIMER_ID])
+
+    async def async_handle_save_playlist(call: ServiceCall) -> None:
+        data = SAVE_PLAYLIST_SCHEMA(dict(call.data))
+        await manager.async_remember_playlist(
+            data[ATTR_PLAYLIST_URI],
+            data[ATTR_PLAYLIST_NAME],
+        )
 
     hass.services.async_register(
         DOMAIN,
@@ -525,4 +630,10 @@ def async_register_services(
         "cancel",
         async_handle_cancel,
         schema=CANCEL_SERVICE_SCHEMA,
+    )
+    hass.services.async_register(
+        DOMAIN,
+        "save_playlist",
+        async_handle_save_playlist,
+        schema=SAVE_PLAYLIST_SCHEMA,
     )

@@ -61,3 +61,20 @@ class SpotifySleepTimerPlaylistSelect(SelectEntity):
             await self._manager.async_select_playlist(option)
         except ValueError as err:
             raise HomeAssistantError(str(err)) from err
+
+    @property
+    def extra_state_attributes(self) -> dict[str, object]:
+        """Return selected playlist details."""
+        entry = self._manager.playlist_entry_by_uri(
+            self._manager.selected_playlist_uri
+        )
+        if entry is None:
+            return {"playlist_uri": None}
+        return {
+            "playlist_name": entry.name,
+            "playlist_uri": entry.uri,
+            "playlists": [
+                {"name": playlist.name, "uri": playlist.uri}
+                for playlist in self._manager.playlist_history
+            ],
+        }
