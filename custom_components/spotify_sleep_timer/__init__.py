@@ -4,10 +4,10 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 import logging
+from typing import TYPE_CHECKING
 
 import voluptuous as vol
 
-from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import ATTR_ENTITY_ID
 from homeassistant.core import HomeAssistant, ServiceCall, callback
 from homeassistant.exceptions import ConfigEntryNotReady, HomeAssistantError
@@ -16,6 +16,9 @@ from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.event import async_track_point_in_time, async_track_time_interval
 from homeassistant.helpers.storage import Store
 from homeassistant.util import dt as dt_util
+
+if TYPE_CHECKING:
+    from homeassistant.config_entries import ConfigEntry
 
 from .const import (
     ATTR_DURATION,
@@ -312,13 +315,41 @@ class SpotifySleepTimerManager:
         }
         domain, service = notify_service.split(".", 1)
         if domain == "notify" and self.hass.states.get(notify_service) is not None:
+            mobile_app_service = self.async_get_mobile_app_notify_service(
+                notify_service
+            )
+            if mobile_app_service is not None and (
+                notification_data or message == "clear_notification"
+            ):
+                service_data = {
+                    "message": message,
+                    "data": payload_data,
+                }
+                if title:
+                    service_data["title"] = title
+                await self.hass.services.async_call(
+                    "notify",
+                    mobile_app_service,
+                    service_data,
+                    blocking=False,
+                )
+                return
+
+            if notification_data:
+                raise HomeAssistantError(
+                    "Android countdown notification data is not supported by "
+                    "notify.send_message, and no matching Companion App "
+                    f"mobile-app notify action was found for {notify_service}"
+                )
+
+            if message == "clear_notification":
+                return
             if not self.hass.services.has_service("notify", "send_message"):
                 _LOGGER.warning("Notify entity service is not available")
                 return
             service_data = {
                 ATTR_ENTITY_ID: notify_service,
                 "message": message,
-                "data": payload_data,
             }
             if title:
                 service_data["title"] = title
@@ -345,6 +376,15 @@ class SpotifySleepTimerManager:
         await self.hass.services.async_call(
             domain, service, service_data, blocking=False
         )
+
+    @callback
+    def async_get_mobile_app_notify_service(self, notify_entity: str) -> str | None:
+        """Return the mobile app notify service matching a notify entity."""
+        _, object_id = notify_entity.split(".", 1)
+        mobile_app_service = f"mobile_app_{object_id}"
+        if self.hass.services.has_service("notify", mobile_app_service):
+            return mobile_app_service
+        return None
 
 
 def format_duration(seconds: int) -> str:

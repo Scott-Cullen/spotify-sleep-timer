@@ -57,6 +57,12 @@ Notifications are sent to the default notify target chosen during setup. You can
 still pass `notify_service` in the service data to override that target for a
 specific timer.
 
+Select your phone's notify entity during setup. For Android countdown options,
+the integration automatically uses the matching Companion App mobile-app notify
+action internally when Home Assistant exposes one, because the generic
+`notify.send_message` entity action does not accept Android-specific countdown
+fields.
+
 To start a specific playlist instead, pass a Spotify playlist URI or link:
 
 ```yaml
