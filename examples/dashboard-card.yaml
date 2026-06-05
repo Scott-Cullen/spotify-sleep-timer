@@ -14,7 +14,6 @@ cards:
           action: call-service
           service: spotify_sleep_timer.start
           data:
-            media_player: media_player.spotify_your_name
             playlist_uri: spotify:playlist:37i9dQZF1DX4WYpdgoIcn6
             duration: 1800
             notify_service: notify.mobile_app_your_phone
@@ -25,7 +24,6 @@ cards:
           action: call-service
           service: spotify_sleep_timer.start
           data:
-            media_player: media_player.spotify_your_name
             playlist_uri: spotify:playlist:37i9dQZF1DX4WYpdgoIcn6
             duration: 3600
             notify_service: notify.mobile_app_your_phone
@@ -36,7 +34,6 @@ cards:
           action: call-service
           service: spotify_sleep_timer.start
           data:
-            media_player: media_player.spotify_your_name
             playlist_uri: spotify:playlist:37i9dQZF1DX4WYpdgoIcn6
             duration: 5400
             notify_service: notify.mobile_app_your_phone

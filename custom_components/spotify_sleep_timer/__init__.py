@@ -10,27 +10,33 @@ import voluptuous as vol
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import ATTR_ENTITY_ID
 from homeassistant.core import HomeAssistant, ServiceCall, callback
+from homeassistant.exceptions import ConfigEntryNotReady, HomeAssistantError
 from homeassistant.helpers import config_validation as cv
+from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.event import async_track_point_in_time, async_track_time_interval
 from homeassistant.util import dt as dt_util
 
 from .const import (
     ATTR_DURATION,
     ATTR_MEDIA_PLAYER,
+    CONF_DEFAULT_MEDIA_PLAYER,
+    CONF_SPOTIFY_CONFIG_ENTRY_ID,
     ATTR_NOTIFY_SERVICE,
     ATTR_PLAYLIST_URI,
     ATTR_TIMER_ID,
     DATA_MANAGER,
+    DATA_SPOTIFY_MEDIA_PLAYER,
     DEFAULT_TIMER_ID,
     DOMAIN,
     PLATFORMS,
+    SPOTIFY_DOMAIN,
 )
 
 _LOGGER = logging.getLogger(__name__)
 
 START_SERVICE_SCHEMA = vol.Schema(
     {
-        vol.Required(ATTR_MEDIA_PLAYER): cv.entity_id,
+        vol.Optional(ATTR_MEDIA_PLAYER): cv.entity_id,
         vol.Required(ATTR_PLAYLIST_URI): cv.string,
         vol.Required(ATTR_DURATION): vol.All(vol.Coerce(int), vol.Range(min=1)),
         vol.Required(ATTR_NOTIFY_SERVICE): cv.string,
@@ -242,19 +248,67 @@ def format_duration(seconds: int) -> str:
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Set up Spotify Sleep Timer from a config entry."""
     hass.data.setdefault(DOMAIN, {})
+    hass.data[DOMAIN][DATA_SPOTIFY_MEDIA_PLAYER] = async_get_spotify_media_player(
+        hass, entry
+    )
     manager = hass.data[DOMAIN].get(DATA_MANAGER)
     if manager is None:
         manager = SpotifySleepTimerManager(hass)
         hass.data[DOMAIN][DATA_MANAGER] = manager
         async_register_services(hass, manager)
 
+    entry.async_on_unload(entry.add_update_listener(async_update_listener))
+
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
     return True
 
 
+async def async_update_listener(hass: HomeAssistant, entry: ConfigEntry) -> None:
+    """Handle options updates."""
+    hass.data[DOMAIN][DATA_SPOTIFY_MEDIA_PLAYER] = async_get_spotify_media_player(
+        hass, entry
+    )
+
+
 async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Unload a config entry."""
-    return await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
+    unload_ok = await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
+    if unload_ok:
+        hass.data[DOMAIN].pop(DATA_SPOTIFY_MEDIA_PLAYER, None)
+    return unload_ok
+
+
+def async_get_spotify_media_player(
+    hass: HomeAssistant, entry: ConfigEntry
+) -> str | None:
+    """Return the media player entity from the linked Spotify config entry."""
+    spotify_entry_id = entry.options.get(
+        CONF_SPOTIFY_CONFIG_ENTRY_ID,
+        entry.data.get(CONF_SPOTIFY_CONFIG_ENTRY_ID),
+    )
+    if spotify_entry_id is None:
+        return None
+
+    spotify_entry = hass.config_entries.async_get_entry(spotify_entry_id)
+    if spotify_entry is None or spotify_entry.domain != SPOTIFY_DOMAIN:
+        raise ConfigEntryNotReady("Linked Spotify integration is not available")
+
+    configured_media_player = entry.options.get(
+        CONF_DEFAULT_MEDIA_PLAYER,
+        entry.data.get(CONF_DEFAULT_MEDIA_PLAYER),
+    )
+    if configured_media_player is not None:
+        return configured_media_player
+
+    entity_registry = er.async_get(hass)
+    spotify_entities = er.async_entries_for_config_entry(
+        entity_registry, spotify_entry_id
+    )
+    for entity_entry in spotify_entities:
+        if entity_entry.domain == "media_player":
+            return entity_entry.entity_id
+
+    raise ConfigEntryNotReady("Linked Spotify integration has no media player entity")
 
 
 @callback
@@ -265,9 +319,18 @@ def async_register_services(
 
     async def async_handle_start(call: ServiceCall) -> None:
         data = START_SERVICE_SCHEMA(call.data)
+        media_player = data.get(ATTR_MEDIA_PLAYER) or hass.data[DOMAIN].get(
+            DATA_SPOTIFY_MEDIA_PLAYER
+        )
+        if media_player is None:
+            raise HomeAssistantError(
+                "No Spotify media player was provided or found from the linked "
+                "Spotify integration"
+            )
+
         await manager.async_start(
             timer_id=data[ATTR_TIMER_ID],
-            media_player=data[ATTR_MEDIA_PLAYER],
+            media_player=media_player,
             playlist_uri=data[ATTR_PLAYLIST_URI],
             duration=data[ATTR_DURATION],
             notify_service=data[ATTR_NOTIFY_SERVICE],

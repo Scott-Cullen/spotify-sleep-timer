@@ -3,11 +3,36 @@
     "step": {
       "user": {
         "title": "Spotify Sleep Timer",
-        "description": "Add the Spotify Sleep Timer services and status sensor."
+        "description": "Connect Spotify Sleep Timer to an existing Spotify integration entry.",
+        "data": {
+          "spotify_config_entry_id": "Spotify integration",
+          "default_media_player": "Default Spotify media player"
+        }
+      },
+      "init": {
+        "title": "Spotify Sleep Timer",
+        "description": "Choose the Spotify integration entry and media player this helper should use.",
+        "data": {
+          "spotify_config_entry_id": "Spotify integration",
+          "default_media_player": "Default Spotify media player"
+        }
       }
     },
     "abort": {
-      "already_configured": "Spotify Sleep Timer is already configured."
+      "already_configured": "Spotify Sleep Timer is already configured.",
+      "spotify_not_configured": "Set up the Spotify integration before adding Spotify Sleep Timer."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Spotify Sleep Timer",
+        "description": "Choose the Spotify integration entry and media player this helper should use.",
+        "data": {
+          "spotify_config_entry_id": "Spotify integration",
+          "default_media_player": "Default Spotify media player"
+        }
+      }
     }
   }
 }

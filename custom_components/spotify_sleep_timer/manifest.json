@@ -2,6 +2,7 @@
   "domain": "spotify_sleep_timer",
   "name": "Spotify Sleep Timer",
   "codeowners": [],
+  "after_dependencies": ["spotify"],
   "config_flow": true,
   "documentation": "https://github.com/Scott-Cullen/spotify-sleep-timer",
   "integration_type": "helper",

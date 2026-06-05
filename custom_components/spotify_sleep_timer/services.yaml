@@ -4,8 +4,8 @@ start:
   fields:
     media_player:
       name: Media player
-      description: Spotify-capable media player entity to control.
-      required: true
+      description: Optional Spotify media player override. If omitted, the linked default Spotify media player is used.
+      required: false
       selector:
         entity:
           domain: media_player
