@@ -299,9 +299,7 @@ class SpotifySleepTimerManager:
             return
 
         domain, service = notify_service.split(".", 1)
-        if domain == "notify" and not self.hass.services.has_service(
-            domain, service
-        ):
+        if domain == "notify" and self.hass.states.get(notify_service) is not None:
             if not self.hass.services.has_service("notify", "send_message"):
                 _LOGGER.warning("Notify entity service is not available")
                 return
@@ -315,6 +313,12 @@ class SpotifySleepTimerManager:
                 },
                 blocking=False,
             )
+            return
+
+        if domain == "notify" and not self.hass.services.has_service(
+            domain, service
+        ):
+            _LOGGER.warning("Notify service not found: %s", notify_service)
             return
 
         await self.hass.services.async_call(
