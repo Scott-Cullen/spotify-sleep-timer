@@ -55,17 +55,17 @@ cancel:
         text:
 save_playlist:
   name: Save Spotify sleep timer playlist
-  description: Save or rename a playlist for the playlist selector without starting a timer.
+  description: Save or rename a playlist for the playlist selector without starting a timer. If fields are omitted, the dashboard playlist name and URL text entities are used.
   fields:
     playlist_name:
       name: Playlist name
       description: Friendly name to show in the playlist selector.
-      required: true
+      required: false
       selector:
         text:
     playlist_uri:
       name: Playlist URI
       description: Spotify playlist URI or URL.
-      required: true
+      required: false
       selector:
         text:

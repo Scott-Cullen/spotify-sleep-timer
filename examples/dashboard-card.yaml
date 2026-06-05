@@ -7,6 +7,16 @@ cards:
         name: Time remaining
       - entity: select.spotify_sleep_timer_playlist
         name: Playlist
+      - entity: text.spotify_sleep_timer_playlist_name
+        name: New playlist name
+      - entity: text.spotify_sleep_timer_playlist_url
+        name: New playlist URL
+  - type: button
+    name: Save playlist
+    icon: mdi:playlist-plus
+    tap_action:
+      action: call-service
+      service: spotify_sleep_timer.save_playlist
   - type: horizontal-stack
     cards:
       - type: button

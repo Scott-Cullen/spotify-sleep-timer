@@ -62,8 +62,8 @@ CANCEL_SERVICE_SCHEMA = vol.Schema(
 
 SAVE_PLAYLIST_SCHEMA = vol.Schema(
     {
-        vol.Required(ATTR_PLAYLIST_NAME): cv.string,
-        vol.Required(ATTR_PLAYLIST_URI): cv.string,
+        vol.Optional(ATTR_PLAYLIST_NAME): cv.string,
+        vol.Optional(ATTR_PLAYLIST_URI): cv.string,
     }
 )
 
@@ -105,6 +105,8 @@ class SpotifySleepTimerManager:
         self.timers: dict[str, SleepTimer] = {}
         self.playlist_history: list[PlaylistEntry] = []
         self.selected_playlist_uri: str | None = None
+        self.draft_playlist_name: str | None = None
+        self.draft_playlist_uri: str | None = None
         self._store = Store(hass, STORAGE_VERSION, STORAGE_KEY)
         self._listeners: set[Callable[[], None]] = set()
 
@@ -175,6 +177,14 @@ class SpotifySleepTimerManager:
         ):
             self.selected_playlist_uri = selected_playlist_uri
 
+        draft_playlist_name = data.get("draft_playlist_name")
+        if isinstance(draft_playlist_name, str):
+            self.draft_playlist_name = draft_playlist_name
+
+        draft_playlist_uri = data.get("draft_playlist_uri")
+        if isinstance(draft_playlist_uri, str):
+            self.draft_playlist_uri = draft_playlist_uri
+
     async def async_select_playlist(self, option: str) -> None:
         """Select a playlist option."""
         if option == CURRENT_QUEUE_OPTION:
@@ -196,8 +206,22 @@ class SpotifySleepTimerManager:
                     for entry in self.playlist_history
                 ],
                 "selected_playlist_uri": self.selected_playlist_uri,
+                "draft_playlist_name": self.draft_playlist_name,
+                "draft_playlist_uri": self.draft_playlist_uri,
             }
         )
+
+    async def async_set_draft_playlist_name(self, playlist_name: str) -> None:
+        """Set the draft playlist name used by the dashboard."""
+        self.draft_playlist_name = playlist_name.strip() or None
+        await self.async_save_playlist_history()
+        self.async_notify_listeners()
+
+    async def async_set_draft_playlist_uri(self, playlist_uri: str) -> None:
+        """Set the draft playlist URI used by the dashboard."""
+        self.draft_playlist_uri = playlist_uri.strip() or None
+        await self.async_save_playlist_history()
+        self.async_notify_listeners()
 
     async def async_remember_playlist(
         self, playlist_uri: str, playlist_name: str | None = None
@@ -614,9 +638,16 @@ def async_register_services(
 
     async def async_handle_save_playlist(call: ServiceCall) -> None:
         data = SAVE_PLAYLIST_SCHEMA(dict(call.data))
+        playlist_name = data.get(ATTR_PLAYLIST_NAME) or manager.draft_playlist_name
+        playlist_uri = data.get(ATTR_PLAYLIST_URI) or manager.draft_playlist_uri
+        if playlist_name is None or playlist_uri is None:
+            raise HomeAssistantError(
+                "Playlist name and playlist URI must be provided or entered "
+                "on the Spotify Sleep Timer dashboard"
+            )
         await manager.async_remember_playlist(
-            data[ATTR_PLAYLIST_URI],
-            data[ATTR_PLAYLIST_NAME],
+            playlist_uri,
+            playlist_name,
         )
 
     hass.services.async_register(

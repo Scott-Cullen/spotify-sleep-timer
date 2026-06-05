@@ -83,6 +83,15 @@ data:
   playlist_uri: spotify:playlist:37i9dQZF1DX4WYpdgoIcn6
 ```
 
+The dashboard example includes editable text entities for saving playlists from
+the card:
+
+- `text.spotify_sleep_timer_playlist_name`
+- `text.spotify_sleep_timer_playlist_url`
+
+Enter a name and URL, tap **Save playlist**, then pick the saved name from
+`select.spotify_sleep_timer_playlist`.
+
 The Spotify integration does not expose a general playback history to custom
 integrations, so this selector tracks playlists saved or used by the sleep timer
 itself.
