@@ -14,22 +14,29 @@ from homeassistant.exceptions import ConfigEntryNotReady, HomeAssistantError
 from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.event import async_track_point_in_time, async_track_time_interval
+from homeassistant.helpers.storage import Store
 from homeassistant.util import dt as dt_util
 
 from .const import (
     ATTR_DURATION,
     ATTR_MEDIA_PLAYER,
     CONF_DEFAULT_MEDIA_PLAYER,
+    CONF_DEFAULT_NOTIFY_SERVICE,
     CONF_SPOTIFY_CONFIG_ENTRY_ID,
+    CURRENT_QUEUE_OPTION,
     ATTR_NOTIFY_SERVICE,
     ATTR_PLAYLIST_URI,
     ATTR_TIMER_ID,
     DATA_MANAGER,
+    DATA_NOTIFY_SERVICE,
     DATA_SPOTIFY_MEDIA_PLAYER,
     DEFAULT_TIMER_ID,
     DOMAIN,
+    MAX_PLAYLIST_HISTORY,
     PLATFORMS,
     SPOTIFY_DOMAIN,
+    STORAGE_KEY,
+    STORAGE_VERSION,
 )
 
 _LOGGER = logging.getLogger(__name__)
@@ -37,9 +44,9 @@ _LOGGER = logging.getLogger(__name__)
 START_SERVICE_SCHEMA = vol.Schema(
     {
         vol.Optional(ATTR_MEDIA_PLAYER): cv.entity_id,
-        vol.Required(ATTR_PLAYLIST_URI): cv.string,
+        vol.Optional(ATTR_PLAYLIST_URI): cv.string,
         vol.Required(ATTR_DURATION): vol.All(vol.Coerce(int), vol.Range(min=1)),
-        vol.Required(ATTR_NOTIFY_SERVICE): cv.string,
+        vol.Optional(ATTR_NOTIFY_SERVICE): cv.string,
         vol.Optional(ATTR_TIMER_ID, default=DEFAULT_TIMER_ID): cv.string,
     }
 )
@@ -55,7 +62,7 @@ class SleepTimer:
 
     timer_id: str
     media_player: str
-    playlist_uri: str
+    playlist_uri: str | None
     notify_service: str
     started_at: datetime
     ends_at: datetime
@@ -75,6 +82,9 @@ class SpotifySleepTimerManager:
     def __init__(self, hass: HomeAssistant) -> None:
         self.hass = hass
         self.timers: dict[str, SleepTimer] = {}
+        self.playlist_history: list[str] = []
+        self.selected_playlist_uri: str | None = None
+        self._store = Store(hass, STORAGE_VERSION, STORAGE_KEY)
         self._listeners: set[Callable[[], None]] = set()
 
     @callback
@@ -101,28 +111,100 @@ class SpotifySleepTimerManager:
             return None
         return min(self.timers.values(), key=lambda timer: timer.ends_at)
 
+    @property
+    def playlist_options(self) -> list[str]:
+        """Return the playlist options shown by the select entity."""
+        return [CURRENT_QUEUE_OPTION, *self.playlist_history]
+
+    @property
+    def selected_playlist_option(self) -> str:
+        """Return the current select option."""
+        return self.selected_playlist_uri or CURRENT_QUEUE_OPTION
+
+    async def async_load(self) -> None:
+        """Load persisted playlist history."""
+        data = await self._store.async_load() or {}
+        playlist_history = data.get("playlist_history", [])
+        if isinstance(playlist_history, list):
+            self.playlist_history = [
+                playlist
+                for playlist in playlist_history[:MAX_PLAYLIST_HISTORY]
+                if isinstance(playlist, str)
+            ]
+
+        selected_playlist_uri = data.get("selected_playlist_uri")
+        if (
+            isinstance(selected_playlist_uri, str)
+            and selected_playlist_uri in self.playlist_history
+        ):
+            self.selected_playlist_uri = selected_playlist_uri
+
+    async def async_select_playlist(self, option: str) -> None:
+        """Select a playlist option."""
+        if option == CURRENT_QUEUE_OPTION:
+            self.selected_playlist_uri = None
+        elif option in self.playlist_history:
+            self.selected_playlist_uri = option
+        else:
+            raise ValueError(f"Unknown playlist option: {option}")
+
+        await self.async_save_playlist_history()
+        self.async_notify_listeners()
+
+    async def async_save_playlist_history(self) -> None:
+        """Persist playlist history."""
+        await self._store.async_save(
+            {
+                "playlist_history": self.playlist_history,
+                "selected_playlist_uri": self.selected_playlist_uri,
+            }
+        )
+
+    async def async_remember_playlist(self, playlist_uri: str) -> None:
+        """Remember the playlist URI used by the sleep timer."""
+        self.playlist_history = [
+            playlist
+            for playlist in self.playlist_history
+            if playlist != playlist_uri
+        ]
+        self.playlist_history.insert(0, playlist_uri)
+        self.playlist_history = self.playlist_history[:MAX_PLAYLIST_HISTORY]
+        self.selected_playlist_uri = playlist_uri
+        await self.async_save_playlist_history()
+
     async def async_start(
         self,
         timer_id: str,
         media_player: str,
-        playlist_uri: str,
+        playlist_uri: str | None,
         duration: int,
         notify_service: str,
     ) -> None:
         """Start Spotify playback and schedule a sleep timer."""
+        playlist_uri = playlist_uri or self.selected_playlist_uri
+
         if timer_id in self.timers:
             await self.async_cancel(timer_id, send_notification=False)
 
-        await self.hass.services.async_call(
-            "media_player",
-            "play_media",
-            {
-                ATTR_ENTITY_ID: media_player,
-                "media_content_id": playlist_uri,
-                "media_content_type": "playlist",
-            },
-            blocking=False,
-        )
+        if playlist_uri:
+            await self.async_remember_playlist(playlist_uri)
+            await self.hass.services.async_call(
+                "media_player",
+                "play_media",
+                {
+                    ATTR_ENTITY_ID: media_player,
+                    "media_content_id": playlist_uri,
+                    "media_content_type": "playlist",
+                },
+                blocking=False,
+            )
+        else:
+            await self.hass.services.async_call(
+                "media_player",
+                "media_play",
+                {ATTR_ENTITY_ID: media_player},
+                blocking=False,
+            )
 
         now = dt_util.utcnow()
         ends_at = now + timedelta(seconds=duration)
@@ -211,12 +293,30 @@ class SpotifySleepTimerManager:
     async def async_send_notification(
         self, notify_service: str, timer_id: str, title: str, message: str
     ) -> None:
-        """Send or replace a Home Assistant Companion App notification."""
+        """Send or replace a Home Assistant notification."""
         if "." not in notify_service:
             _LOGGER.warning("Invalid notify service: %s", notify_service)
             return
 
         domain, service = notify_service.split(".", 1)
+        if domain == "notify" and not self.hass.services.has_service(
+            domain, service
+        ):
+            if not self.hass.services.has_service("notify", "send_message"):
+                _LOGGER.warning("Notify entity service is not available")
+                return
+            await self.hass.services.async_call(
+                "notify",
+                "send_message",
+                {
+                    ATTR_ENTITY_ID: notify_service,
+                    "title": title,
+                    "message": message,
+                },
+                blocking=False,
+            )
+            return
+
         await self.hass.services.async_call(
             domain,
             service,
@@ -251,9 +351,11 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     hass.data[DOMAIN][DATA_SPOTIFY_MEDIA_PLAYER] = async_get_spotify_media_player(
         hass, entry
     )
+    hass.data[DOMAIN][DATA_NOTIFY_SERVICE] = async_get_default_notify_service(entry)
     manager = hass.data[DOMAIN].get(DATA_MANAGER)
     if manager is None:
         manager = SpotifySleepTimerManager(hass)
+        await manager.async_load()
         hass.data[DOMAIN][DATA_MANAGER] = manager
         async_register_services(hass, manager)
 
@@ -268,6 +370,7 @@ async def async_update_listener(hass: HomeAssistant, entry: ConfigEntry) -> None
     hass.data[DOMAIN][DATA_SPOTIFY_MEDIA_PLAYER] = async_get_spotify_media_player(
         hass, entry
     )
+    hass.data[DOMAIN][DATA_NOTIFY_SERVICE] = async_get_default_notify_service(entry)
 
 
 async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
@@ -275,7 +378,16 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     unload_ok = await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
     if unload_ok:
         hass.data[DOMAIN].pop(DATA_SPOTIFY_MEDIA_PLAYER, None)
+        hass.data[DOMAIN].pop(DATA_NOTIFY_SERVICE, None)
     return unload_ok
+
+
+def async_get_default_notify_service(entry: ConfigEntry) -> str | None:
+    """Return the configured default notify target."""
+    return entry.options.get(
+        CONF_DEFAULT_NOTIFY_SERVICE,
+        entry.data.get(CONF_DEFAULT_NOTIFY_SERVICE),
+    )
 
 
 def async_get_spotify_media_player(
@@ -327,13 +439,20 @@ def async_register_services(
                 "No Spotify media player was provided or found from the linked "
                 "Spotify integration"
             )
+        notify_service = data.get(ATTR_NOTIFY_SERVICE) or hass.data[DOMAIN].get(
+            DATA_NOTIFY_SERVICE
+        )
+        if notify_service is None:
+            raise HomeAssistantError(
+                "No notify entity was provided or configured for Spotify Sleep Timer"
+            )
 
         await manager.async_start(
             timer_id=data[ATTR_TIMER_ID],
             media_player=media_player,
-            playlist_uri=data[ATTR_PLAYLIST_URI],
+            playlist_uri=data.get(ATTR_PLAYLIST_URI),
             duration=data[ATTR_DURATION],
-            notify_service=data[ATTR_NOTIFY_SERVICE],
+            notify_service=notify_service,
         )
 
     async def async_handle_cancel(call: ServiceCall) -> None:

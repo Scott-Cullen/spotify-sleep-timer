@@ -10,6 +10,7 @@ from homeassistant.helpers import selector
 
 from .const import (
     CONF_DEFAULT_MEDIA_PLAYER,
+    CONF_DEFAULT_NOTIFY_SERVICE,
     CONF_SPOTIFY_CONFIG_ENTRY_ID,
     DOMAIN,
     SPOTIFY_DOMAIN,
@@ -38,6 +39,10 @@ def _spotify_schema(user_input: dict[str, Any] | None = None) -> vol.Schema:
                     }
                 }
             ),
+            vol.Required(
+                CONF_DEFAULT_NOTIFY_SERVICE,
+                default=user_input.get(CONF_DEFAULT_NOTIFY_SERVICE),
+            ): selector.selector({"entity": {"domain": "notify"}}),
         }
     )
 
@@ -99,6 +104,10 @@ class SpotifySleepTimerOptionsFlow(config_entries.OptionsFlow):
             CONF_DEFAULT_MEDIA_PLAYER: self._config_entry.options.get(
                 CONF_DEFAULT_MEDIA_PLAYER,
                 self._config_entry.data.get(CONF_DEFAULT_MEDIA_PLAYER),
+            ),
+            CONF_DEFAULT_NOTIFY_SERVICE: self._config_entry.options.get(
+                CONF_DEFAULT_NOTIFY_SERVICE,
+                self._config_entry.data.get(CONF_DEFAULT_NOTIFY_SERVICE),
             ),
         }
         return self.async_show_form(

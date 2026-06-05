@@ -6,7 +6,8 @@
         "description": "Connect Spotify Sleep Timer to an existing Spotify integration entry.",
         "data": {
           "spotify_config_entry_id": "Spotify integration",
-          "default_media_player": "Default Spotify media player"
+          "default_media_player": "Default Spotify media player",
+          "default_notify_service": "Default notify target"
         }
       },
       "init": {
@@ -14,7 +15,8 @@
         "description": "Choose the Spotify integration entry and media player this helper should use.",
         "data": {
           "spotify_config_entry_id": "Spotify integration",
-          "default_media_player": "Default Spotify media player"
+          "default_media_player": "Default Spotify media player",
+          "default_notify_service": "Default notify target"
         }
       }
     },
@@ -30,7 +32,8 @@
         "description": "Choose the Spotify integration entry and media player this helper should use.",
         "data": {
           "spotify_config_entry_id": "Spotify integration",
-          "default_media_player": "Default Spotify media player"
+          "default_media_player": "Default Spotify media player",
+          "default_notify_service": "Default notify target"
         }
       }
     }

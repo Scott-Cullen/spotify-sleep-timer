@@ -1,6 +1,6 @@
 start:
   name: Start Spotify sleep timer
-  description: Start a Spotify playlist and stop playback when the timer expires.
+  description: Start a Spotify playlist, or resume the current queue, and stop playback when the timer expires.
   fields:
     media_player:
       name: Media player
@@ -11,8 +11,8 @@ start:
           domain: media_player
     playlist_uri:
       name: Playlist URI
-      description: Spotify playlist URI, for example spotify:playlist:37i9dQZF1DX4WYpdgoIcn6.
-      required: true
+      description: Optional Spotify playlist URI. If omitted, the selected recent playlist is used, or the current queue resumes when the selector is set to Current queue.
+      required: false
       selector:
         text:
     duration:
@@ -27,8 +27,8 @@ start:
           mode: box
     notify_service:
       name: Notify service
-      description: Mobile app notify service, for example notify.mobile_app_your_phone.
-      required: true
+      description: Optional notify entity or legacy notify service override. If omitted, the notify target selected during setup is used.
+      required: false
       selector:
         text:
     timer_id:
