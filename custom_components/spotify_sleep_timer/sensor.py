@@ -53,11 +53,11 @@ class SpotifySleepTimerSensor(SensorEntity):
             self._remove_listener = None
 
     @property
-    def native_value(self) -> int | None:
+    def native_value(self) -> int:
         """Return remaining minutes for the primary active timer."""
         timer = self._manager.primary_timer
         if timer is None:
-            return None
+            return 0
         return (timer.remaining_seconds + 59) // 60
 
     @property

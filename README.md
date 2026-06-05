@@ -92,6 +92,13 @@ the card:
 Enter a name and URL, tap **Save playlist**, then pick the saved name from
 `select.spotify_sleep_timer_playlist`.
 
+To remove a saved playlist, select it in `select.spotify_sleep_timer_playlist`
+and call:
+
+```yaml
+service: spotify_sleep_timer.remove_playlist
+```
+
 The Spotify integration does not expose a general playback history to custom
 integrations, so this selector tracks playlists saved or used by the sleep timer
 itself.

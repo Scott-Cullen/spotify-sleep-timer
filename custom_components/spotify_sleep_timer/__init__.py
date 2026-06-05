@@ -67,6 +67,13 @@ SAVE_PLAYLIST_SCHEMA = vol.Schema(
     }
 )
 
+REMOVE_PLAYLIST_SCHEMA = vol.Schema(
+    {
+        vol.Optional(ATTR_PLAYLIST_NAME): cv.string,
+        vol.Optional(ATTR_PLAYLIST_URI): cv.string,
+    }
+)
+
 
 @dataclass
 class PlaylistEntry:
@@ -238,6 +245,31 @@ class SpotifySleepTimerManager:
         )
         self.playlist_history = self.playlist_history[:MAX_PLAYLIST_HISTORY]
         self.selected_playlist_uri = playlist_uri
+        await self.async_save_playlist_history()
+        self.async_notify_listeners()
+
+    async def async_remove_playlist(
+        self,
+        playlist_uri: str | None = None,
+        playlist_name: str | None = None,
+    ) -> None:
+        """Remove a saved playlist from the selector."""
+        entry = None
+        if playlist_uri is not None:
+            entry = self.playlist_entry_by_uri(playlist_uri)
+        elif playlist_name is not None:
+            entry = self.playlist_entry_by_name(playlist_name)
+        elif self.selected_playlist_uri is not None:
+            entry = self.playlist_entry_by_uri(self.selected_playlist_uri)
+
+        if entry is None:
+            raise HomeAssistantError("No saved playlist was selected or provided")
+
+        self.playlist_history = [
+            playlist for playlist in self.playlist_history if playlist.uri != entry.uri
+        ]
+        if self.selected_playlist_uri == entry.uri:
+            self.selected_playlist_uri = None
         await self.async_save_playlist_history()
         self.async_notify_listeners()
 
@@ -650,6 +682,13 @@ def async_register_services(
             playlist_name,
         )
 
+    async def async_handle_remove_playlist(call: ServiceCall) -> None:
+        data = REMOVE_PLAYLIST_SCHEMA(dict(call.data))
+        await manager.async_remove_playlist(
+            playlist_uri=data.get(ATTR_PLAYLIST_URI),
+            playlist_name=data.get(ATTR_PLAYLIST_NAME),
+        )
+
     hass.services.async_register(
         DOMAIN,
         "start",
@@ -667,4 +706,10 @@ def async_register_services(
         "save_playlist",
         async_handle_save_playlist,
         schema=SAVE_PLAYLIST_SCHEMA,
+    )
+    hass.services.async_register(
+        DOMAIN,
+        "remove_playlist",
+        async_handle_remove_playlist,
+        schema=REMOVE_PLAYLIST_SCHEMA,
     )

@@ -69,3 +69,19 @@ save_playlist:
       required: false
       selector:
         text:
+remove_playlist:
+  name: Remove Spotify sleep timer playlist
+  description: Remove a playlist from the playlist selector. If fields are omitted, the currently selected playlist is removed.
+  fields:
+    playlist_name:
+      name: Playlist name
+      description: Friendly playlist name to remove.
+      required: false
+      selector:
+        text:
+    playlist_uri:
+      name: Playlist URI
+      description: Spotify playlist URI or URL to remove.
+      required: false
+      selector:
+        text:
