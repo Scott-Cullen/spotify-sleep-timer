@@ -318,7 +318,7 @@ def async_register_services(
     """Register integration services."""
 
     async def async_handle_start(call: ServiceCall) -> None:
-        data = START_SERVICE_SCHEMA(call.data)
+        data = START_SERVICE_SCHEMA(dict(call.data))
         media_player = data.get(ATTR_MEDIA_PLAYER) or hass.data[DOMAIN].get(
             DATA_SPOTIFY_MEDIA_PLAYER
         )
@@ -337,7 +337,7 @@ def async_register_services(
         )
 
     async def async_handle_cancel(call: ServiceCall) -> None:
-        data = CANCEL_SERVICE_SCHEMA(call.data)
+        data = CANCEL_SERVICE_SCHEMA(dict(call.data))
         await manager.async_cancel(data[ATTR_TIMER_ID])
 
     hass.services.async_register(
