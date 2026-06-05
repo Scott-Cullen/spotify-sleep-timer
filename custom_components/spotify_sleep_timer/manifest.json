@@ -3,10 +3,10 @@
   "name": "Spotify Sleep Timer",
   "codeowners": [],
   "config_flow": true,
-  "documentation": "https://github.com/your-user/spotify-sleep-timer",
+  "documentation": "https://github.com/Scott-Cullen/spotify-sleep-timer",
   "integration_type": "helper",
   "iot_class": "local_push",
-  "issue_tracker": "https://github.com/your-user/spotify-sleep-timer/issues",
+  "issue_tracker": "https://github.com/Scott-Cullen/spotify-sleep-timer/issues",
   "requirements": [],
   "version": "0.1.0"
 }
