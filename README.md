@@ -59,6 +59,14 @@ If you omit `timer_id`, the integration uses `spotify_sleep_timer`.
 
 ## Dashboard example
 
+For a ready-to-paste Lovelace card with 30, 60, and 90 minute buttons, see
+[`examples/dashboard-card.yaml`](examples/dashboard-card.yaml). Replace these
+placeholders before using it:
+
+- `media_player.spotify_your_name`
+- `spotify:playlist:37i9dQZF1DX4WYpdgoIcn6`
+- `notify.mobile_app_your_phone`
+
 ```yaml
 type: entities
 entities:

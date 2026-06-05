@@ -1,0 +1,50 @@
+type: vertical-stack
+cards:
+  - type: entities
+    title: Spotify Sleep Timer
+    entities:
+      - entity: sensor.spotify_sleep_timer
+        name: Time remaining
+  - type: horizontal-stack
+    cards:
+      - type: button
+        name: 30 min
+        icon: mdi:timer-play
+        tap_action:
+          action: call-service
+          service: spotify_sleep_timer.start
+          data:
+            media_player: media_player.spotify_your_name
+            playlist_uri: spotify:playlist:37i9dQZF1DX4WYpdgoIcn6
+            duration: 1800
+            notify_service: notify.mobile_app_your_phone
+      - type: button
+        name: 60 min
+        icon: mdi:timer-play
+        tap_action:
+          action: call-service
+          service: spotify_sleep_timer.start
+          data:
+            media_player: media_player.spotify_your_name
+            playlist_uri: spotify:playlist:37i9dQZF1DX4WYpdgoIcn6
+            duration: 3600
+            notify_service: notify.mobile_app_your_phone
+      - type: button
+        name: 90 min
+        icon: mdi:timer-play
+        tap_action:
+          action: call-service
+          service: spotify_sleep_timer.start
+          data:
+            media_player: media_player.spotify_your_name
+            playlist_uri: spotify:playlist:37i9dQZF1DX4WYpdgoIcn6
+            duration: 5400
+            notify_service: notify.mobile_app_your_phone
+  - type: button
+    name: Cancel sleep timer
+    icon: mdi:timer-cancel
+    tap_action:
+      action: call-service
+      service: spotify_sleep_timer.cancel
+      data:
+        timer_id: spotify_sleep_timer
