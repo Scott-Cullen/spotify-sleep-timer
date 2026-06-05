@@ -21,4 +21,4 @@ DATA_NOTIFY_SERVICE = "notify_service"
 DATA_SPOTIFY_MEDIA_PLAYER = "spotify_media_player"
 STORAGE_KEY = f"{DOMAIN}.playlist_history"
 STORAGE_VERSION = 1
-PLATFORMS = ["sensor", "select", "text"]
+PLATFORMS = ["sensor", "select", "text", "button"]

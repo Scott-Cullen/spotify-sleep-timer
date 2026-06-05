@@ -12,60 +12,72 @@ cards:
           name: Time remaining
       - entity: select.spotify_sleep_timer_playlist
         name: Playlist
+      - type: conditional
+        conditions:
+          - entity: sensor.spotify_sleep_timer
+            state_not: "0"
+        row:
+          type: button
+          name: Cancel sleep timer
+          icon: mdi:timer-cancel
+          action_name: Cancel
+          tap_action:
+            action: perform-action
+            perform_action: spotify_sleep_timer.cancel
+            data:
+              timer_id: spotify_sleep_timer
   - type: horizontal-stack
     cards:
       - type: button
         name: 30 min
         icon: mdi:timer-play
         tap_action:
-          action: call-service
-          service: spotify_sleep_timer.start
+          action: perform-action
+          perform_action: spotify_sleep_timer.start
           data:
             duration: 1800
       - type: button
         name: 45 min
         icon: mdi:timer-play
         tap_action:
-          action: call-service
-          service: spotify_sleep_timer.start
+          action: perform-action
+          perform_action: spotify_sleep_timer.start
           data:
             duration: 2700
       - type: button
         name: 60 min
         icon: mdi:timer-play
         tap_action:
-          action: call-service
-          service: spotify_sleep_timer.start
+          action: perform-action
+          perform_action: spotify_sleep_timer.start
           data:
             duration: 3600
-  - type: button
-    name: Cancel sleep timer
-    icon: mdi:timer-cancel
-    tap_action:
-      action: call-service
-      service: spotify_sleep_timer.cancel
-      data:
-        timer_id: spotify_sleep_timer
-  - type: vertical-stack
-    cards:
-      - type: entities
-        title: Playlist editor
+  - type: entities
+    title: Playlist editor
+    entities:
+      - entity: text.spotify_sleep_timer_playlist_name
+        name: New playlist name
+      - entity: text.spotify_sleep_timer_playlist_url
+        name: New playlist URL
+      - type: buttons
         entities:
-          - entity: text.spotify_sleep_timer_playlist_name
-            name: New playlist name
-          - entity: text.spotify_sleep_timer_playlist_url
-            name: New playlist URL
-      - type: horizontal-stack
-        cards:
-          - type: tile
+          - entity: button.spotify_sleep_timer_save_playlist
             name: Save
             icon: mdi:playlist-plus
+            show_name: true
             tap_action:
-              action: call-service
-              service: spotify_sleep_timer.save_playlist
-          - type: tile
+              action: perform-action
+              perform_action: button.press
+              target:
+                entity_id: button.spotify_sleep_timer_save_playlist
+          - entity: button.spotify_sleep_timer_remove_playlist
             name: Remove
             icon: mdi:playlist-remove
+            show_name: true
             tap_action:
-              action: call-service
-              service: spotify_sleep_timer.remove_playlist
+              action: perform-action
+              confirmation:
+                text: Remove the selected playlist?
+              perform_action: button.press
+              target:
+                entity_id: button.spotify_sleep_timer_remove_playlist

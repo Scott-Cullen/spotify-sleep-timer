@@ -88,12 +88,14 @@ the card:
 
 - `text.spotify_sleep_timer_playlist_name`
 - `text.spotify_sleep_timer_playlist_url`
+- `button.spotify_sleep_timer_save_playlist`
+- `button.spotify_sleep_timer_remove_playlist`
 
-Enter a name and URL, tap **Save playlist**, then pick the saved name from
+Enter a name and URL, tap **Save**, then pick the saved name from
 `select.spotify_sleep_timer_playlist`.
 
 To remove a saved playlist, select it in `select.spotify_sleep_timer_playlist`
-and call:
+and tap **Remove**, or call:
 
 ```yaml
 service: spotify_sleep_timer.remove_playlist
@@ -120,7 +122,7 @@ If you omit `timer_id`, the integration uses `spotify_sleep_timer`.
 
 ## Dashboard example
 
-For a ready-to-paste Lovelace card with 30, 60, and 90 minute buttons, see
+For a ready-to-paste Lovelace card with 30, 45, and 60 minute buttons, see
 [`examples/dashboard-card.yaml`](examples/dashboard-card.yaml).
 
 ```yaml
