@@ -27,6 +27,7 @@ class SpotifySleepTimerPlaylistSelect(SelectEntity):
     _attr_icon = "mdi:playlist-music"
     _attr_name = "Playlist"
     _attr_should_poll = False
+    _attr_suggested_object_id = f"{DOMAIN}_playlist"
     _attr_unique_id = f"{DOMAIN}_playlist"
 
     def __init__(self, manager: SpotifySleepTimerManager) -> None:

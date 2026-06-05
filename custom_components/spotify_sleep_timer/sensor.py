@@ -33,6 +33,7 @@ class SpotifySleepTimerSensor(SensorEntity):
     entity_description = SENSOR_DESCRIPTION
     _attr_has_entity_name = True
     _attr_name = None
+    _attr_suggested_object_id = DOMAIN
     _attr_unique_id = f"{DOMAIN}_active_timer"
 
     def __init__(self, manager: SpotifySleepTimerManager) -> None:

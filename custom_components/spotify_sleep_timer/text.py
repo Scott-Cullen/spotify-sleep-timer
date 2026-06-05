@@ -31,6 +31,7 @@ class SpotifySleepTimerPlaylistNameText(TextEntity):
     _attr_icon = "mdi:playlist-edit"
     _attr_name = "Playlist name"
     _attr_should_poll = False
+    _attr_suggested_object_id = f"{DOMAIN}_playlist_name"
     _attr_unique_id = f"{DOMAIN}_playlist_name"
 
     def __init__(self, manager: SpotifySleepTimerManager) -> None:
@@ -66,6 +67,7 @@ class SpotifySleepTimerPlaylistUriText(TextEntity):
     _attr_icon = "mdi:link-variant"
     _attr_name = "Playlist URL"
     _attr_should_poll = False
+    _attr_suggested_object_id = f"{DOMAIN}_playlist_url"
     _attr_unique_id = f"{DOMAIN}_playlist_url"
 
     def __init__(self, manager: SpotifySleepTimerManager) -> None:
