@@ -13,7 +13,7 @@ SENSOR_DESCRIPTION = SensorEntityDescription(
     key="active_timer",
     name="Spotify Sleep Timer",
     icon="mdi:timer-sand",
-    native_unit_of_measurement=UnitOfTime.SECONDS,
+    native_unit_of_measurement=UnitOfTime.MINUTES,
 )
 
 
@@ -53,11 +53,11 @@ class SpotifySleepTimerSensor(SensorEntity):
 
     @property
     def native_value(self) -> int | None:
-        """Return remaining seconds for the primary active timer."""
+        """Return remaining minutes for the primary active timer."""
         timer = self._manager.primary_timer
         if timer is None:
             return None
-        return timer.remaining_seconds
+        return (timer.remaining_seconds + 59) // 60
 
     @property
     def extra_state_attributes(self) -> dict[str, object]:
@@ -69,6 +69,7 @@ class SpotifySleepTimerSensor(SensorEntity):
                 "playlist_uri": active.playlist_uri,
                 "duration": active.duration,
                 "remaining_seconds": active.remaining_seconds,
+                "remaining_minutes": (active.remaining_seconds + 59) // 60,
                 "ends_at": active.ends_at.isoformat(),
             }
             for timer_id, active in self._manager.timers.items()
@@ -80,6 +81,8 @@ class SpotifySleepTimerSensor(SensorEntity):
             "media_player": timer.media_player,
             "playlist_uri": timer.playlist_uri,
             "duration": timer.duration,
+            "remaining_seconds": timer.remaining_seconds,
+            "remaining_minutes": (timer.remaining_seconds + 59) // 60,
             "ends_at": timer.ends_at.isoformat(),
             "active_timers": active_timers,
         }

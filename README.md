@@ -12,7 +12,7 @@ app notification updated with the remaining time.
   started by this integration.
 - Connects to an existing Home Assistant Spotify integration entry.
 - Creates a Home Assistant sleep timer for the requested duration.
-- Updates a mobile app notification with the remaining time.
+- Creates a single Android chronometer notification that counts down locally.
 - Stops the media player when the timer finishes.
 - Exposes a sensor with the active timer state.
 
@@ -71,8 +71,10 @@ Every playlist started through this integration is saved into
 The Spotify integration does not expose a general playback history to custom
 integrations, so this selector tracks playlists used by the sleep timer itself.
 
-The notification is updated using the same mobile notification tag, so it should
-replace itself instead of stacking a new notification every minute.
+On Android, the notification is sent once with a persistent tagged chronometer,
+so the phone counts down locally instead of receiving a new notification every
+minute. The integration clears that notification when the timer finishes or is
+cancelled.
 
 Cancel the current timer with:
 

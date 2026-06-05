@@ -216,24 +216,13 @@ class SpotifySleepTimerManager:
                 {ATTR_ENTITY_ID: media_player},
                 blocking=False,
             )
-            await self.async_send_notification(
-                notify_service,
-                timer_id,
-                "Spotify sleep timer finished",
-                "Playback has been stopped.",
-            )
+            await self.async_clear_notification(notify_service, timer_id)
             self.async_remove_timer(timer_id)
 
         async def async_tick(_: datetime) -> None:
             timer = self.timers.get(timer_id)
             if timer is None:
                 return
-            await self.async_send_notification(
-                timer.notify_service,
-                timer.timer_id,
-                "Spotify sleep timer",
-                f"{format_duration(timer.remaining_seconds)} remaining.",
-            )
             self.async_notify_listeners()
 
         cancel_stop = async_track_point_in_time(self.hass, async_finish, ends_at)
@@ -257,7 +246,16 @@ class SpotifySleepTimerManager:
             notify_service,
             timer_id,
             "Spotify sleep timer",
-            f"{format_duration(duration)} remaining.",
+            "Playback will stop when the timer reaches zero.",
+            {
+                "alert_once": True,
+                "chronometer": True,
+                "persistent": True,
+                "sticky": True,
+                "tag": timer_id,
+                "when": duration,
+                "when_relative": True,
+            },
         )
         self.async_notify_listeners()
 
@@ -273,12 +271,7 @@ class SpotifySleepTimerManager:
         self.async_remove_timer(timer_id)
 
         if send_notification:
-            await self.async_send_notification(
-                notify_service,
-                timer_id,
-                "Spotify sleep timer cancelled",
-                "The sleep timer was cancelled.",
-            )
+            await self.async_clear_notification(notify_service, timer_id)
 
     @callback
     def async_remove_timer(self, timer_id: str) -> None:
@@ -290,27 +283,49 @@ class SpotifySleepTimerManager:
         timer.cancel_tick()
         self.async_notify_listeners()
 
+    async def async_clear_notification(self, notify_service: str, timer_id: str) -> None:
+        """Clear a tagged Home Assistant notification."""
+        await self.async_send_notification(
+            notify_service,
+            timer_id,
+            "",
+            "clear_notification",
+        )
+
     async def async_send_notification(
-        self, notify_service: str, timer_id: str, title: str, message: str
+        self,
+        notify_service: str,
+        timer_id: str,
+        title: str,
+        message: str,
+        notification_data: dict[str, object] | None = None,
     ) -> None:
         """Send or replace a Home Assistant notification."""
         if "." not in notify_service:
             _LOGGER.warning("Invalid notify service: %s", notify_service)
             return
 
+        payload_data = {
+            "tag": timer_id,
+            "notification_icon": "mdi:timer-sand",
+            **(notification_data or {}),
+        }
         domain, service = notify_service.split(".", 1)
         if domain == "notify" and self.hass.states.get(notify_service) is not None:
             if not self.hass.services.has_service("notify", "send_message"):
                 _LOGGER.warning("Notify entity service is not available")
                 return
+            service_data = {
+                ATTR_ENTITY_ID: notify_service,
+                "message": message,
+                "data": payload_data,
+            }
+            if title:
+                service_data["title"] = title
             await self.hass.services.async_call(
                 "notify",
                 "send_message",
-                {
-                    ATTR_ENTITY_ID: notify_service,
-                    "title": title,
-                    "message": message,
-                },
+                service_data,
                 blocking=False,
             )
             return
@@ -321,18 +336,14 @@ class SpotifySleepTimerManager:
             _LOGGER.warning("Notify service not found: %s", notify_service)
             return
 
+        service_data = {
+            "message": message,
+            "data": payload_data,
+        }
+        if title:
+            service_data["title"] = title
         await self.hass.services.async_call(
-            domain,
-            service,
-            {
-                "title": title,
-                "message": message,
-                "data": {
-                    "tag": timer_id,
-                    "notification_icon": "mdi:timer-sand",
-                },
-            },
-            blocking=False,
+            domain, service, service_data, blocking=False
         )
 
 
