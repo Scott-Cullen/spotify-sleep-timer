@@ -1,0 +1,13 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Spotify Sleep Timer",
+        "description": "Add the Spotify Sleep Timer services and status sensor."
+      }
+    },
+    "abort": {
+      "already_configured": "Spotify Sleep Timer is already configured."
+    }
+  }
+}
